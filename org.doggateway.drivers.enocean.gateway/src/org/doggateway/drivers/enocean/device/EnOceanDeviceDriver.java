@@ -115,7 +115,7 @@ public abstract class EnOceanDeviceDriver extends EnOceanDriver implements
 	 */
 	public EnOceanDeviceDriver()
 	{
-		// intialize atomic references
+		// initialize atomic references
 		this.gateway = new AtomicReference<EnOceanGatewayDriver>();
 		this.network = new AtomicReference<EnOceanNetwork>();
 
