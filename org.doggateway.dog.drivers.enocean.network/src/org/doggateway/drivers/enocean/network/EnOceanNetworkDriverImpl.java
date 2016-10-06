@@ -48,8 +48,8 @@ import org.osgi.service.log.LogService;
  * @author <a href="mailto:dario.bonino@gmail.com">Dario Bonino</a>
  *
  */
-public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
-		ManagedService, EnJDeviceListener, EnJTeachInListener
+public class EnOceanNetworkDriverImpl implements EnOceanNetwork, ManagedService,
+		EnJDeviceListener, EnJTeachInListener
 {
 	// -------- the configuration parameters ---------
 
@@ -90,6 +90,10 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 	// the lowest-level EnOcean link
 	private EnJLink enOceanLink;
 
+	// the current config properties
+	private String serialPort;
+	private String deviceDB;
+
 	/**
 	 * Initializes the inner data structures, while not instantiating the
 	 * underlying EnJConnection object, which instead can be prepared only after
@@ -129,7 +133,7 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 		this.logger.log(LogService.LOG_DEBUG, "Activated...");
 
 		// register the service
-		this.registerNetworkService();
+		// this.registerNetworkService();
 	}
 
 	/**
@@ -141,7 +145,8 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 		// unregister the service
 		this.unregisterNetworkService();
 
-		// TODO: perform house keeping stuff here...
+		// clean underlying connections
+		this.clean();
 
 		// log
 		this.logger.log(LogService.LOG_INFO, "Deactivated...");
@@ -182,8 +187,8 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 		}
 
 		// get the low-level device described by the given device info
-		EnOceanDevice device = this.enOceanConnection.getDevice(devInfo
-				.getUid());
+		EnOceanDevice device = this.enOceanConnection
+				.getDevice(devInfo.getUid());
 
 		// connect the driver instance with the low-level device to enable
 		// direct attachment of EEPListeners and easier configuration set-up
@@ -220,9 +225,8 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 		if (this.deviceDiscoveryListeners != null)
 			this.deviceDiscoveryListeners.add(listener);
 		else
-			this.logger
-					.log(LogService.LOG_ERROR,
-							"The device discovery listener set has not been initialized.");
+			this.logger.log(LogService.LOG_ERROR,
+					"The device discovery listener set has not been initialized.");
 
 	}
 
@@ -244,9 +248,8 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 		if (this.teachInListeners != null)
 			this.teachInListeners.add(listener);
 		else
-			this.logger
-					.log(LogService.LOG_ERROR,
-							"The EnOcean teach-in listener set has not been initialized.");
+			this.logger.log(LogService.LOG_ERROR,
+					"The EnOcean teach-in listener set has not been initialized.");
 
 	}
 
@@ -270,8 +273,8 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 	}
 
 	@Override
-	public void enableExplicitTeachIn(String deviceLowAddress,
-			String deviceEEP, int timeoutMillis)
+	public void enableExplicitTeachIn(String deviceLowAddress, String deviceEEP,
+			int timeoutMillis)
 	{
 		// forward the command to the low-level library
 		this.enOceanConnection.enableTeachIn(deviceLowAddress, deviceEEP,
@@ -340,7 +343,7 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 		{
 			// debug log
 			logger.log(LogService.LOG_DEBUG,
-					"Received configuration properties");
+					"Received configuration properties " + this);
 
 			// get the serial port to which the physical gateway is connected
 			// TODO: implement a serial port scanner process to remove the need
@@ -356,53 +359,79 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 			// check if needed parameters are available
 			if ((serialPort != null) && (!serialPort.isEmpty()))
 			{
-				try
+				// check if the parameters where not already configured and if
+				// some configuration already exists, check whether the given
+				// one
+				// is different or not
+				if ((this.serialPort == null)
+						|| (!this.serialPort.equals(serialPort))
+								&& ((this.deviceDB == null)
+										|| (!this.deviceDB.equals(deviceDB))))
 				{
-					// create the lowest link layer
-					this.enOceanLink = new EnJLink(serialPort);
-
-					// check the low-level device db filename
-					if ((deviceDB != null) && (!deviceDB.isEmpty()))
+					// delete old connections if needed
+					if ((this.serialPort != null)
+							&& (!this.serialPort.equals(serialPort)))
 					{
-						this.enOceanConnection = new EnJConnection(
-								this.enOceanLink, deviceDB, this);
-					}
-					else
-					{
-						this.enOceanConnection = new EnJConnection(
-								this.enOceanLink, null, this);
-
-					}
-
-					if (this.enOceanConnection != null)
-					{
-						// set this network driver as listener for teach-in
-						// status
-						this.enOceanConnection.addEnJTeachInListener(this);
-
-						// connect to the serial port, i.e. to the EnOcean
-						// gateway
-						this.enOceanLink.connect();
-
 						// log
 						this.logger.log(LogService.LOG_INFO,
-								"persistent device set size: "
-										+ this.enOceanConnection
-												.getKnownDevices().size());
+								"Updating configuration with new port/serial data");
+						// unregister the service as it is changing port...
+						this.unregisterNetworkService();
 
-						// update the service registration
-						this.registerNetworkService();
+						// clean
+						this.clean();
+
+					}
+					try
+					{
+						// store the current config
+						this.serialPort = serialPort;
+						this.deviceDB = deviceDB;
+
+						// create the lowest link layer
+						this.enOceanLink = new EnJLink(serialPort);
+
+						// check the low-level device db filename
+						if ((deviceDB != null) && (!deviceDB.isEmpty()))
+						{
+							this.enOceanConnection = new EnJConnection(
+									this.enOceanLink, deviceDB, this);
+						}
+						else
+						{
+							this.enOceanConnection = new EnJConnection(
+									this.enOceanLink, null, this);
+
+						}
+
+						if (this.enOceanConnection != null)
+						{
+							// set this network driver as listener for teach-in
+							// status
+							this.enOceanConnection.addEnJTeachInListener(this);
+
+							// connect to the serial port, i.e. to the EnOcean
+							// gateway
+							this.enOceanLink.connect();
+
+							// log
+							this.logger.log(LogService.LOG_INFO,
+									"persistent device set size: "
+											+ this.enOceanConnection
+													.getKnownDevices().size());
+
+							// update the service registration
+							this.registerNetworkService();
+						}
+					}
+					catch (Exception e)
+					{
+						this.logger.log(LogService.LOG_ERROR,
+								"Unable to connect to the EnOcean serial interface.",
+								e);
 					}
 				}
-				catch (Exception e)
-				{
-					this.logger
-							.log(LogService.LOG_ERROR,
-									"Unable to connect to the EnOcean serial interface.",
-									e);
-				}
 			}
-
 		}
 
 	}
@@ -421,9 +450,9 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 		{
 			// build the corresponding device info
 			final EnOceanDeviceInfo devInfo = new EnOceanDeviceInfo(
-					device.getDeviceUID(), ByteUtils.toHexString(device
-							.getAddress()), device.getEEP().getEEPIdentifier()
-							.asEEPString());
+					device.getDeviceUID(),
+					ByteUtils.toHexString(device.getAddress()),
+					device.getEEP().getEEPIdentifier().asEEPString());
 
 			// store the device info
 			this.availableDevices.put(device.getDeviceUID(), devInfo);
@@ -437,8 +466,8 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 			// generates issues at some point.
 			// *****************************
 			if ((this.enOceanConnection != null)
-					&& ((this.enOceanConnection.isTeachInEnabled() || this.enOceanConnection
-							.isSmartTeachInEnabled())))
+					&& ((this.enOceanConnection.isTeachInEnabled()
+							|| this.enOceanConnection.isSmartTeachInEnabled())))
 			{
 
 				// the triggering task
@@ -488,8 +517,8 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 		if (this.availableDevices.containsKey(changedDevice.getDeviceUID()))
 		{
 			// check if any driver is "connected to the device"
-			EnOceanDriverInstance driverInstance = this.connectedDrivers
-					.get(this.availableDevices.get(changedDevice.getDeviceUID()));
+			EnOceanDriverInstance driverInstance = this.connectedDrivers.get(
+					this.availableDevices.get(changedDevice.getDeviceUID()));
 
 			// update the binding
 			// here the driver shall be informed that the device is no more
@@ -522,7 +551,8 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 		{
 			// register the service, with no properties
 			this.regServiceEnOceanDriverImpl = this.bundleContext
-					.registerService(EnOceanNetwork.class.getName(), this, null);
+					.registerService(EnOceanNetwork.class.getName(), this,
+							null);
 		}
 
 	}
@@ -539,6 +569,29 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork,
 			this.regServiceEnOceanDriverImpl.unregister();
 		}
 
+	}
+
+	/**
+	 * Cleans up connections, to be exploited upon de-activation and/or on
+	 * configuration updates, when needed.
+	 */
+	private void clean()
+	{
+
+		// disconnect the low layer
+		if ((this.enOceanLink != null) && (this.enOceanConnection != null))
+		{
+			//disconnect from the serial
+			this.enOceanLink.disconnect();
+			// delete the EnOcean connection object
+			this.enOceanConnection = null;
+			// delete the EnOcean link object
+			this.enOceanLink = null;
+
+			// log
+			this.logger.log(LogService.LOG_INFO,
+					"Cleaned all orphan connections...");
+		}
 	}
 
 	private void notifyTeachIn(boolean teachIn)
