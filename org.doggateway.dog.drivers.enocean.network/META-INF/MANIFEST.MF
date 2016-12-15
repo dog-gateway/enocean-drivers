@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: EnOceanNetworkDriver
 Bundle-SymbolicName: org.doggateway.drivers.enocean.network
-Bundle-Version: 1.0.0
+Bundle-Version: 1.0.1
 Bundle-Vendor: The Dog Gateway
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 Service-Component: OSGI-INF/enocean-network-driver.xml
@@ -19,3 +19,4 @@ Import-Package: it.polito.elite.dog.core.library.model;version="1.1.0",
 Export-Package: org.doggateway.drivers.enocean.network,
  org.doggateway.drivers.enocean.network.info,
  org.doggateway.drivers.enocean.network.interfaces
+Bundle-ActivationPolicy: lazy
