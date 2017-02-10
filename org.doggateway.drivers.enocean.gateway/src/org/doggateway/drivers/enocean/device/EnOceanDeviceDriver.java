@@ -363,6 +363,11 @@ public abstract class EnOceanDeviceDriver extends EnOceanDriver implements
 				this.managedInstances.put(device.getDeviceId(), driverInstance);
 			}
 		}
+		else
+		{
+			//unget the device (it is already attached)
+			this.context.ungetService(reference);
+		}
 
 		return null;
 
