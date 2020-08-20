@@ -331,6 +331,12 @@ public class EnOceanNetworkDriverImpl implements EnOceanNetwork, ManagedService,
 			listener.teachInDisabled();
 
 	}
+	
+	public void modified(BundleContext ctx)
+	{
+		// Intentionally left empty, used just to avoid bundle deactivation on
+        // update.
+	}
 
 	@Override
 	public void updated(Dictionary<String, ?> properties)
